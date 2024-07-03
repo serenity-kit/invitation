@@ -1,0 +1,60 @@
+attacker[active]
+
+principal Alice[
+	knows private invitation_unlock_key
+	generates invitation_secret
+	knows private alice_server_session_key
+	knows public invitation_id_input_constant
+]
+
+principal Server[
+	knows private alice_server_session_key
+	knows private bob_server_session_key
+]
+
+principal Bob[
+	knows private bob_server_session_key
+]
+
+principal Alice[
+	invitation_id = MAC(invitation_unlock_key, invitation_id_input_constant)
+	invitation_ciphertext = AEAD_ENC(invitation_unlock_key, invitation_secret, invitation_id)
+	invitation_server = ENC(alice_server_session_key, CONCAT(invitation_id, invitation_ciphertext))
+]
+
+Alice -> Server: invitation_server
+
+principal Server[
+	server_invitation_id, server_invitation_ciphertext = SPLIT(DEC(alice_server_session_key, invitation_server))
+]
+
+principal Bob[
+	knows private invitation_unlock_key
+	bob_invitation_id = MAC(invitation_unlock_key, invitation_id_input_constant)
+]
+
+Bob -> Server: bob_invitation_id
+
+principal Server[
+	invitation_bob = ENC(bob_server_session_key, server_invitation_ciphertext)
+]
+
+Server -> Bob: invitation_bob
+
+principal Bob[
+	bob_invitation_ciphertext = DEC(bob_server_session_key, invitation_bob)
+	bob_invitation_secret = AEAD_DEC(invitation_unlock_key, bob_invitation_ciphertext, bob_invitation_id)
+]
+
+phase[1]
+
+principal Server[
+	leaks server_invitation_ciphertext
+	leaks server_invitation_id
+]
+
+queries[
+	confidentiality? invitation_unlock_key
+	confidentiality? bob_invitation_secret
+	equivalence? invitation_id, bob_invitation_id
+]
